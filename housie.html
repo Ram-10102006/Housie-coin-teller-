@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bingo Number Generator with Previous Number Display</title>
+<style>
+  body {
+    margin: 0;
+    background: #0b1220;
+    color: white;
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    height: 100vh;
+    padding: 20px;
+  }
+  .container {
+    display: flex;
+    gap: 40px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 10px;
+  }
+  .number {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background-color: #00c853;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 18px;
+    color: #000;
+    cursor: default;
+    transition: background-color 0.3s;
+  }
+  .number.drawn {
+    background-color: #ff1744;
+    color: #fff;
+  }
+  .right {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+  }
+  #display {
+    font-size: 120px;
+    font-weight: bold;
+    color: #ffeb3b;
+    margin-bottom: 20px;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+  }
+  #controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+  }
+  button {
+    background: #ffeb3b;
+    color: #000;
+    font-size: 20px;
+    font-weight: bold;
+    border: none;
+    padding: 15px 30px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  button:hover {
+    transform: scale(1.05);
+  }
+  select {
+    font-size: 16px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: none;
+  }
+  #autoBtn.active {
+    background-color: #4caf50;
+    color: #fff;
+  }
+
+  /* Previous number section */
+  #prevDisplay {
+    font-size: 28px;
+    font-weight: bold;
+    color: #ff5252;
+    margin-bottom: 5px;
+  }
+  #prevBtn {
+    background-color: #ff5252;
+    color: #fff;
+    font-size: 18px;
+    font-weight: bold;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  #prevBtn:hover {
+    transform: scale(1.05);
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="grid" id="grid"></div>
+  <div class="right">
+    <div id="display">--</div>
+    <div id="controls">
+      <button id="generateBtn">Generate Number</button>
+
+      <!-- Previous number display + button -->
+      <div id="prevDisplay">--</div>
+      <button id="prevBtn">Previous Number</button>
+
+      <select id="language">
+        <option value="en">English</option>
+        <option value="te">Telugu</option>
+      </select>
+      <button id="autoBtn">Start Auto Generate</button>
+      <button id="resetBtn">Reset Game</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const grid = document.getElementById('grid');
+  const display = document.getElementById('display');
+  const generateBtn = document.getElementById('generateBtn');
+  const autoBtn = document.getElementById('autoBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const languageSelect = document.getElementById('language');
+  const prevBtn = document.getElementById('prevBtn');
+  const prevDisplay = document.getElementById('prevDisplay');
+
+  let numbers = Array.from({length: 90}, (_, i) => i + 1);
+  let remaining = [...numbers];
+  let history = [];
+  let autoInterval = null;
+
+  function createGrid() {
+    grid.innerHTML = "";
+    numbers.forEach(num => {
+      const div = document.createElement('div');
+      div.classList.add('number');
+      div.textContent = num;
+      grid.appendChild(div);
+    });
+  }
+  createGrid();
+  let allButtons = document.querySelectorAll('.number');
+
+  function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+  }
+  shuffle(remaining);
+
+  const teluguMap = {
+    1:"ఒకటి",2:"రెండు",3:"మూడు",4:"నాలుగు",5:"ఐదు",6:"ఆరు",7:"ఏడు",8:"ఎనిమిది",9:"తొమ్మిది",10:"పది",
+    11:"పదకొండు",12:"పన్నెండు",13:"పదమూడు",14:"పద్నాలుగు",15:"పదిహేను",16:"పదహారు",17:"పదిహేడు",
+    18:"పద్దెనిమిది",19:"పందొమ్మిది",20:"ఇరవై",30:"ముప్పై",40:"నలభై",50:"యాభై",60:"అరవై",70:"డెబ్బై",80:"ఎనభై",90:"తొంభై"
+  };
+
+  function numberToTelugu(num){
+    if(teluguMap[num]) return teluguMap[num];
+    if(num < 100){
+      let tens = Math.floor(num/10)*10;
+      let ones = num%10;
+      return (teluguMap[tens] || '') + ' ' + (teluguMap[ones] || '');
+    }
+    return num.toString();
+  }
+
+  function speakNumber(num){
+    const lang = languageSelect.value;
+    const utter = new SpeechSynthesisUtterance();
+    utter.rate = 0.9;
+    if(lang === 'en'){
+      utter.lang = 'en-IN';
+      utter.text = num.toString();
+    } else {
+      utter.lang = 'te-IN';
+      utter.text = numberToTelugu(num);
+    }
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utter);
+  }
+
+  function generateNumber(){
+    if (remaining.length === 0) {
+      display.textContent = "END";
+      speakNumber("Game over");
+      clearInterval(autoInterval);
+      autoInterval = null;
+      autoBtn.classList.remove('active');
+      autoBtn.textContent = "Start Auto Generate";
+      return;
+    }
+    const num = remaining.pop();
+    display.textContent = num;
+    allButtons[num - 1].classList.add('drawn');
+    speakNumber(num);
+    history.push(num);
+
+    // Update previous number display
+    if(history.length > 1){
+      prevDisplay.textContent = history[history.length - 2];
+    }
+  }
+
+  generateBtn.addEventListener('click', generateNumber);
+
+  autoBtn.addEventListener('click', () => {
+    if (autoInterval) {
+      clearInterval(autoInterval);
+      autoInterval = null;
+      autoBtn.classList.remove('active');
+      autoBtn.textContent = "Start Auto Generate";
+    } else {
+      autoBtn.classList.add('active');
+      autoBtn.textContent = "Stop Auto Generate";
+      generateNumber();
+      autoInterval = setInterval(generateNumber, 4000);
+    }
+  });
+
+  resetBtn.addEventListener('click', () => {
+    clearInterval(autoInterval);
+    autoInterval = null;
+    autoBtn.classList.remove('active');
+    autoBtn.textContent = "Start Auto Generate";
+    display.textContent = "--";
+    prevDisplay.textContent = "--";
+    remaining = [...numbers];
+    history = [];
+    shuffle(remaining);
+    createGrid();
+    allButtons = document.querySelectorAll('.number');
+    speechSynthesis.cancel();
+  });
+
+  // Previous number button logic
+  prevBtn.addEventListener('click', () => {
+    if(history.length < 2){
+      prevDisplay.textContent = "--";
+      return;
+    }
+    // Remove current number
+    const current = history.pop();
+    const prev = history[history.length - 1];
+    display.textContent = prev;
+    prevDisplay.textContent = history[history.length - 2] || "--";
+    speakNumber(prev);
+  });
+</script>
+
+</body>
+</html>
